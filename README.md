@@ -1,5 +1,10 @@
 # gorest-media
 
+[![CI](https://github.com/nicolasbonnici/gorest-media/actions/workflows/ci.yml/badge.svg)](https://github.com/nicolasbonnici/gorest-media/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/nicolasbonnici/gorest-media.svg)](https://pkg.go.dev/github.com/nicolasbonnici/gorest-media)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/nicolasbonnici/gorest-media)](https://github.com/nicolasbonnici/gorest-media/blob/HEAD/go.mod)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A GoREST plugin that exposes files — images, videos, PDFs, CSV/XLSX spreadsheets, and any
 other format — as a first-class REST resource. Uploaded bytes live on local disk by default
 or on any CDN/object gateway, and the storage backend is swappable without touching the API.
