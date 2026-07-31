@@ -7,10 +7,6 @@ on:
   push:
     branches: [main]
     paths-ignore: [ '**.md', 'LICENSE' ]
-  schedule:
-    # Nightly build verification.
-    - cron: '0 3 * * *'
-  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,7 +20,6 @@ jobs:
   quality:
     name: Code audit
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -40,7 +35,6 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
     needs: quality
 
     # No database services: the suite runs entirely in-process and never reads
@@ -71,7 +65,8 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [quality, test]
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
