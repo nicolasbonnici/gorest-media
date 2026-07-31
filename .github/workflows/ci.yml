@@ -3,66 +3,57 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    paths-ignore: [ '**.md', 'LICENSE' ]
   push:
     branches: [main]
+    paths-ignore: [ '**.md', 'LICENSE' ]
+  schedule:
+    # Nightly build verification.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.26.5'
+  GOLANGCI_LINT_VERSION: 'v2.12.2'
 
 jobs:
   quality:
     name: Code audit
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
-          go-version: '1.26.5'
-      - name: Code audit
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          golangci-lint run ./...
+          go-version: ${{ env.GO_VERSION }}
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
 
   test:
     name: Test
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     needs: quality
 
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-      mysql:
-        image: mysql:9
-        env:
-          MYSQL_ROOT_PASSWORD: test
-          MYSQL_DATABASE: test
-        options: >-
-          --health-cmd "mysqladmin ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 3306:3306
-
+    # No database services: the suite runs entirely in-process and never reads
+    # POSTGRES_URL or MYSQL_URL, so starting them only paid for image pulls
+    # and health-check waits on every run.
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
-          go-version: '1.26.5'
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Download dependencies
         run: go mod download
@@ -76,29 +67,20 @@ jobs:
       - name: Display coverage
         run: go tool cover -func=coverage.out
 
-      - name: Cleanup
-        if: always()
-        run: |
-          go clean -cache -testcache -modcache
-          rm -f coverage.out
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [quality, test]
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
-          go-version: '1.26.5'
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Build verification
         run: go build -v ./...
 
-      - name: Cleanup
-        if: always()
-        run: go clean -cache -testcache -modcache
