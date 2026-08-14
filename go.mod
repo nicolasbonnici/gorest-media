@@ -2,7 +2,7 @@ module github.com/nicolasbonnici/gorest-media
 
 go 1.26
 
-toolchain go1.26.5
+toolchain go1.26.6
 
 require (
 	github.com/gabriel-vasile/mimetype v1.4.15
