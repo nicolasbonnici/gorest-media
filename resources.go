@@ -9,6 +9,7 @@ import (
 	"github.com/nicolasbonnici/gorest/crud"
 	"github.com/nicolasbonnici/gorest/database"
 	"github.com/nicolasbonnici/gorest/processor"
+	"github.com/nicolasbonnici/gorest/rbac"
 )
 
 const uploadField = "file"
@@ -18,6 +19,40 @@ type mediaHandler struct {
 	service   *MediaService
 	converter *MediaConverter
 	config    *Config
+}
+
+// writeGuards is the chain every mutating media route carries: resolve the
+// identity, load its roles, demand one, then demand a write role.
+func writeGuards(db database.Database, config *Config) []fiber.Handler {
+	chain := []fiber.Handler{}
+	if config.AuthMiddleware != nil {
+		chain = append(chain, config.AuthMiddleware)
+	}
+	return append(chain,
+		rbac.RoleLoader(db, config.RoleHierarchy),
+		rbac.RequireAuthenticated(),
+		rbac.RequireAnyRole(config.RoleHierarchy, config.SuperuserRole, config.WriteRoles...),
+	)
+}
+
+// readChain mounts only the identity resolver, so a public read still records
+// who is asking when a token happens to be present.
+func readChain(config *Config) []fiber.Handler {
+	if config.AuthMiddleware != nil {
+		return []fiber.Handler{config.AuthMiddleware}
+	}
+	return nil
+}
+
+// mount registers handler at the end of chain. Fiber v3 takes the first element
+// positionally and the rest variadically, running them in the order given.
+func mount(register func(string, any, ...any) fiber.Router, path string, chain []fiber.Handler, h fiber.Handler) {
+	all := make([]any, 0, len(chain)+1)
+	for _, m := range chain {
+		all = append(all, m)
+	}
+	all = append(all, h)
+	register(path, all[0], all[1:]...)
 }
 
 func RegisterRoutes(router fiber.Router, db database.Database, config *Config, service *MediaService) {
@@ -45,12 +80,15 @@ func RegisterRoutes(router fiber.Router, db database.Database, config *Config, s
 
 	h := &mediaHandler{processor: proc, service: service, converter: converter, config: config}
 
-	router.Post("/media", h.Upload)
-	router.Get("/media", h.GetAll)
-	router.Get("/media/:id", h.GetByID)
-	router.Get("/media/:id/download", h.Download)
-	router.Put("/media/:id", h.Update)
-	router.Delete("/media/:id", h.Delete)
+	write := writeGuards(db, config)
+	read := readChain(config)
+
+	mount(router.Get, "/media", read, h.GetAll)
+	mount(router.Get, "/media/:id", read, h.GetByID)
+	mount(router.Get, "/media/:id/download", read, h.Download)
+	mount(router.Post, "/media", write, h.Upload)
+	mount(router.Put, "/media/:id", write, h.Update)
+	mount(router.Delete, "/media/:id", write, h.Delete)
 }
 
 func (h *mediaHandler) Upload(c fiber.Ctx) error {
