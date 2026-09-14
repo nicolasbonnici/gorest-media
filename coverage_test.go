@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	authcontext "github.com/nicolasbonnici/gorest/auth/context"
+	"github.com/nicolasbonnici/gorest/rbac"
 )
 
 func TestUploadRecordsAuthenticatedUser(t *testing.T) {
@@ -19,6 +20,7 @@ func TestUploadRecordsAuthenticatedUser(t *testing.T) {
 	app := fiber.New()
 	app.Use(func(c fiber.Ctx) error {
 		authcontext.SetUserID(c, userID.String())
+		c.SetContext(rbac.WithRoles(c.Context(), []string{"writer"}))
 		return c.Next()
 	})
 	RegisterRoutes(app, svc.db, svc.config, svc)
@@ -38,6 +40,7 @@ func TestUploadWithMalformedUserIDStaysAnonymous(t *testing.T) {
 	app := fiber.New()
 	app.Use(func(c fiber.Ctx) error {
 		authcontext.SetUserID(c, "not-a-uuid")
+		c.SetContext(rbac.WithRoles(c.Context(), []string{"writer"}))
 		return c.Next()
 	})
 	RegisterRoutes(app, svc.db, svc.config, svc)

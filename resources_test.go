@@ -12,11 +12,12 @@ import (
 	"github.com/gofiber/fiber/v3"
 	pluginmigrations "github.com/nicolasbonnici/gorest-media/migrations"
 	"github.com/nicolasbonnici/gorest/database"
+	"github.com/nicolasbonnici/gorest/rbac"
 
 	_ "github.com/nicolasbonnici/gorest/database/sqlite"
 )
 
-func setupApp(t *testing.T) (*fiber.App, *MediaService) {
+func newApp(t *testing.T, auth fiber.Handler) (*fiber.App, *MediaService) {
 	t.Helper()
 
 	db, err := database.Open("sqlite", "file:"+t.Name()+"?mode=memory&cache=shared")
@@ -48,8 +49,33 @@ func setupApp(t *testing.T) (*fiber.App, *MediaService) {
 	svc := NewMediaService(db, &cfg, storage)
 
 	app := fiber.New()
+	cfg.AuthMiddleware = auth
 	RegisterRoutes(app, db, &cfg, svc)
 	return app, svc
+}
+
+// testUserID is the identity setupApp authenticates as, so the handler tests
+// exercise handlers rather than the guards in front of them.
+const testUserID = "7b66f722-f9fd-48a2-91ae-ac33366a6567"
+
+// setupApp mounts the app as an authenticated writer, which is what the
+// handler-level tests below are about.
+func setupApp(t *testing.T) (*fiber.App, *MediaService) {
+	t.Helper()
+	return newApp(t, stubIdentity(testUserID, "writer"))
+}
+
+// stubIdentity stands in for the host's auth middleware. It seeds the roles
+// directly too: RoleLoader reads them from tables this sqlite fixture does not
+// create, and it leaves an existing context alone when it finds none.
+func stubIdentity(userID string, roles ...string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		if userID != "" {
+			c.Locals("user_id", userID)
+			c.SetContext(rbac.WithRoles(c.Context(), roles))
+		}
+		return c.Next()
+	}
 }
 
 func uploadRequest(t *testing.T, filename string, content []byte, extraName string) *http.Request {

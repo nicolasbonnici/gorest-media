@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gofiber/fiber/v3"
 	"github.com/nicolasbonnici/gorest/database"
 )
 
@@ -43,8 +44,59 @@ type Config struct {
 	// classifying new formats without a code change.
 	KindOverrides map[string]string `json:"kind_overrides" yaml:"kind_overrides"`
 
+	// Reads stay public; uploads and mutations require one of WriteRoles or the
+	// superuser role. Before v0.7 these routes carried no guard, so anyone
+	// could upload to, or delete from, the storage backend anonymously.
+	WriteRoles    []string            `json:"write_roles" yaml:"write_roles"`
+	SuperuserRole string              `json:"superuser_role" yaml:"superuser_role"`
+	RoleHierarchy map[string][]string `json:"role_hierarchy" yaml:"role_hierarchy"`
+
+	// AuthMiddleware is supplied by the plugin loader when the host enables
+	// auth. Without it nothing can present an identity, so the guards deny
+	// every mutation rather than waving them through.
+	AuthMiddleware fiber.Handler `json:"-" yaml:"-"`
+
 	PaginationLimit    int `json:"pagination_limit" yaml:"pagination_limit"`
 	MaxPaginationLimit int `json:"max_pagination_limit" yaml:"max_pagination_limit"`
+}
+
+// DefaultAllowedMimeTypes covers the formats this plugin classifies in kind.go
+// and nothing else. It used to default to nil, which IsAllowedMime reads as
+// "allow anything" - so a stock install accepted scripts and executables and
+// stored them under a web root. Operators who genuinely want everything can
+// still set allowed_mime_types to an empty list explicitly.
+func DefaultAllowedMimeTypes() []string {
+	return []string{
+		// Raster formats are enumerated rather than allowing the whole "image/"
+		// family, because that family includes image/svg+xml - an XML document
+		// that carries <script> and executes when a browser renders it inline.
+		"image/apng",
+		"image/avif",
+		"image/bmp",
+		"image/gif",
+		"image/jpeg",
+		"image/png",
+		"image/tiff",
+		"image/webp",
+		"image/x-icon",
+		"video/",
+		"audio/",
+		"text/plain",
+		"text/csv",
+		"application/pdf",
+		"application/msword",
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"application/rtf",
+		"application/csv",
+		"application/vnd.ms-excel",
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		"application/json",
+		"application/zip",
+		"application/gzip",
+		"application/x-tar",
+		"application/x-7z-compressed",
+		"application/x-rar-compressed",
+	}
 }
 
 func DefaultConfig() Config {
@@ -52,9 +104,15 @@ func DefaultConfig() Config {
 		StorageDriver:      DriverLocal,
 		LocalBasePath:      "./storage/media",
 		MaxFileSize:        50 << 20,
-		AllowedMimeTypes:   nil,
+		AllowedMimeTypes:   DefaultAllowedMimeTypes(),
 		PaginationLimit:    25,
 		MaxPaginationLimit: 100,
+		WriteRoles:         []string{"writer", "moderator"},
+		SuperuserRole:      "admin",
+		RoleHierarchy: map[string][]string{
+			"moderator": {"writer"},
+			"writer":    {"reader"},
+		},
 	}
 }
 
@@ -104,6 +162,11 @@ func (c *Config) applyDefaults() {
 	}
 	if c.MaxPaginationLimit <= 0 {
 		c.MaxPaginationLimit = 100
+	}
+	// nil means "never configured" and gets the safe list; an explicitly empty
+	// list is the operator saying they want every type, and is left alone.
+	if c.AllowedMimeTypes == nil {
+		c.AllowedMimeTypes = DefaultAllowedMimeTypes()
 	}
 }
 
