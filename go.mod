@@ -8,7 +8,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.16
 	github.com/gofiber/fiber/v3 v3.6.1
 	github.com/google/uuid v1.6.0
-	github.com/nicolasbonnici/gorest v0.7.6
+	github.com/nicolasbonnici/gorest v0.7.7
 )
 
 require (
@@ -16,7 +16,7 @@ require (
 	github.com/go-playground/locales v0.14.2 // indirect
 	github.com/go-playground/universal-translator v0.18.2 // indirect
 	github.com/go-playground/validator/v10 v10.30.5 // indirect
-	github.com/gofiber/schema v1.9.0 // indirect
+	github.com/gofiber/schema v1.9.1 // indirect
 	github.com/gofiber/utils/v2 v2.6.3 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/klauspost/compress v1.20.3 // indirect
