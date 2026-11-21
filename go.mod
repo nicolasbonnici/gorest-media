@@ -19,7 +19,7 @@ require (
 	github.com/gofiber/schema v1.9.4 // indirect
 	github.com/gofiber/utils/v2 v2.6.5 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
-	github.com/klauspost/compress v1.20.4 // indirect
+	github.com/klauspost/compress v1.20.5 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/leodido/go-urn v1.5.0 // indirect
 	github.com/mattn/go-colorable v0.1.16 // indirect
